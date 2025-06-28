@@ -32,6 +32,7 @@ func lineColToByteRange(data []byte, startLine, endLine, startCol, endCol int) (
 	if endLine > 0 {
 		endLine--
 	}
+	// Only decrement columns if they are positive (not -1 which means unspecified)
 	if startCol > 0 {
 		startCol--
 	}
@@ -46,8 +47,10 @@ func lineColToByteRange(data []byte, startLine, endLine, startCol, endCol int) (
 
 	for i := 0; i < len(data); i++ {
 		// Check if we're at the start position
-		if currentLine == startLine && currentCol == startCol && startByte == -1 {
-			startByte = i
+		if currentLine == startLine && startByte == -1 {
+			if startCol < 0 || currentCol == startCol {
+				startByte = i
+			}
 		}
 
 		// Check if we're at the end position
