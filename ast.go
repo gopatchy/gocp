@@ -11,22 +11,37 @@ import (
 	"strings"
 )
 
+// Position represents a location in source code
+type Position struct {
+	File   string `json:"file"`
+	Line   int    `json:"line"`
+	Column int    `json:"column"`
+	Offset int    `json:"offset"` // byte offset in file
+}
+
+// newPosition creates a Position from a token.Position
+func newPosition(pos token.Position) Position {
+	return Position{
+		File:   pos.Filename,
+		Line:   pos.Line,
+		Column: pos.Column,
+		Offset: pos.Offset,
+	}
+}
+
 type Symbol struct {
-	Name     string `json:"name"`
-	Type     string `json:"type"`
-	Package  string `json:"package"`
-	File     string `json:"file"`
-	Line     int    `json:"line"`
-	Column   int    `json:"column"`
-	Exported bool   `json:"exported"`
+	Name     string   `json:"name"`
+	Type     string   `json:"type"`
+	Package  string   `json:"package"`
+	Exported bool     `json:"exported"`
+	Position Position `json:"position"`
 }
 
 type TypeInfo struct {
 	Name      string                 `json:"name"`
 	Package   string                 `json:"package"`
-	File      string                 `json:"file"`
-	Line      int                    `json:"line"`
 	Kind      string                 `json:"kind"`
+	Position  Position               `json:"position"`
 	Fields    []FieldInfo            `json:"fields,omitempty"`
 	Methods   []MethodInfo           `json:"methods,omitempty"`
 	Embedded  []string               `json:"embedded,omitempty"`
@@ -35,25 +50,25 @@ type TypeInfo struct {
 }
 
 type FieldInfo struct {
-	Name     string `json:"name"`
-	Type     string `json:"type"`
-	Tag      string `json:"tag,omitempty"`
-	Exported bool   `json:"exported"`
+	Name     string   `json:"name"`
+	Type     string   `json:"type"`
+	Tag      string   `json:"tag,omitempty"`
+	Exported bool     `json:"exported"`
+	Position Position `json:"position"`
 }
 
 type MethodInfo struct {
-	Name      string `json:"name"`
-	Signature string `json:"signature"`
-	Receiver  string `json:"receiver,omitempty"`
-	Exported  bool   `json:"exported"`
+	Name      string   `json:"name"`
+	Signature string   `json:"signature"`
+	Receiver  string   `json:"receiver,omitempty"`
+	Exported  bool     `json:"exported"`
+	Position  Position `json:"position"`
 }
 
 type Reference struct {
-	File     string `json:"file"`
-	Line     int    `json:"line"`
-	Column   int    `json:"column"`
-	Context  string `json:"context"`
-	Kind     string `json:"kind"`
+	Context  string   `json:"context"`
+	Kind     string   `json:"kind"`
+	Position Position `json:"position"`
 }
 
 type Package struct {
@@ -112,10 +127,8 @@ func findSymbols(dir string, pattern string) ([]Symbol, error) {
 						Name:     name,
 						Type:     "function",
 						Package:  pkgName,
-						File:     path,
-						Line:     pos.Line,
-						Column:   pos.Column,
 						Exported: ast.IsExported(name),
+						Position: newPosition(pos),
 					})
 				}
 
@@ -137,10 +150,8 @@ func findSymbols(dir string, pattern string) ([]Symbol, error) {
 								Name:     name,
 								Type:     kind,
 								Package:  pkgName,
-								File:     path,
-								Line:     pos.Line,
-								Column:   pos.Column,
 								Exported: ast.IsExported(name),
+								Position: newPosition(pos),
 							})
 						}
 
@@ -156,10 +167,8 @@ func findSymbols(dir string, pattern string) ([]Symbol, error) {
 									Name:     name.Name,
 									Type:     kind,
 									Package:  pkgName,
-									File:     path,
-									Line:     pos.Line,
-									Column:   pos.Column,
 									Exported: ast.IsExported(name.Name),
+									Position: newPosition(pos),
 								})
 							}
 						}
@@ -194,21 +203,20 @@ func getTypeInfo(dir string, typeName string) (*TypeInfo, error) {
 					if ts, ok := spec.(*ast.TypeSpec); ok && ts.Name.Name == typeName {
 						pos := fset.Position(ts.Pos())
 						info := &TypeInfo{
-							Name:    typeName,
-							Package: file.Name.Name,
-							File:    path,
-							Line:    pos.Line,
+							Name:     typeName,
+							Package:  file.Name.Name,
+							Position: newPosition(pos),
 						}
 
 						switch t := ts.Type.(type) {
 						case *ast.StructType:
 							info.Kind = "struct"
-							info.Fields = extractFields(t)
+							info.Fields = extractFields(t, fset)
 							info.Embedded = extractEmbedded(t)
 
 						case *ast.InterfaceType:
 							info.Kind = "interface"
-							info.Interface = extractInterfaceMethods(t)
+							info.Interface = extractInterfaceMethods(t, fset)
 
 						case *ast.Ident:
 							info.Kind = "alias"
@@ -224,7 +232,7 @@ func getTypeInfo(dir string, typeName string) (*TypeInfo, error) {
 							info.Kind = "other"
 						}
 
-						info.Methods = extractMethods(file, typeName)
+						info.Methods = extractMethods(file, typeName, fset)
 						result = info
 						return false
 					}
@@ -257,11 +265,9 @@ func findReferences(dir string, symbol string) ([]Reference, error) {
 					context := extractContext(src, pos)
 					
 					refs = append(refs, Reference{
-						File:    path,
-						Line:    pos.Line,
-						Column:  pos.Column,
-						Context: context,
-						Kind:    kind,
+						Context:  context,
+						Kind:     kind,
+						Position: newPosition(pos),
 					})
 				}
 
@@ -271,11 +277,9 @@ func findReferences(dir string, symbol string) ([]Reference, error) {
 					context := extractContext(src, pos)
 					
 					refs = append(refs, Reference{
-						File:    path,
-						Line:    pos.Line,
-						Column:  pos.Column,
-						Context: context,
-						Kind:    "selector",
+						Context:  context,
+						Kind:     "selector",
+						Position: newPosition(pos),
 					})
 				}
 			}
@@ -362,7 +366,7 @@ func matchesPattern(name, pattern string) bool {
 	return strings.Contains(name, pattern)
 }
 
-func extractFields(st *ast.StructType) []FieldInfo {
+func extractFields(st *ast.StructType, fset *token.FileSet) []FieldInfo {
 	var fields []FieldInfo
 	
 	for _, field := range st.Fields.List {
@@ -373,19 +377,23 @@ func extractFields(st *ast.StructType) []FieldInfo {
 		}
 
 		if len(field.Names) == 0 {
+			pos := fset.Position(field.Pos())
 			fields = append(fields, FieldInfo{
 				Name:     "",
 				Type:     fieldType,
 				Tag:      tag,
 				Exported: true,
+				Position: newPosition(pos),
 			})
 		} else {
 			for _, name := range field.Names {
+				pos := fset.Position(name.Pos())
 				fields = append(fields, FieldInfo{
 					Name:     name.Name,
 					Type:     fieldType,
 					Tag:      tag,
 					Exported: ast.IsExported(name.Name),
+					Position: newPosition(pos),
 				})
 			}
 		}
@@ -406,17 +414,19 @@ func extractEmbedded(st *ast.StructType) []string {
 	return embedded
 }
 
-func extractInterfaceMethods(it *ast.InterfaceType) []MethodInfo {
+func extractInterfaceMethods(it *ast.InterfaceType, fset *token.FileSet) []MethodInfo {
 	var methods []MethodInfo
 	
 	for _, method := range it.Methods.List {
 		if len(method.Names) > 0 {
 			for _, name := range method.Names {
 				sig := exprToString(method.Type)
+				pos := fset.Position(name.Pos())
 				methods = append(methods, MethodInfo{
 					Name:      name.Name,
 					Signature: sig,
 					Exported:  ast.IsExported(name.Name),
+					Position:  newPosition(pos),
 				})
 			}
 		}
@@ -425,7 +435,7 @@ func extractInterfaceMethods(it *ast.InterfaceType) []MethodInfo {
 	return methods
 }
 
-func extractMethods(file *ast.File, typeName string) []MethodInfo {
+func extractMethods(file *ast.File, typeName string, fset *token.FileSet) []MethodInfo {
 	var methods []MethodInfo
 	
 	for _, decl := range file.Decls {
@@ -434,11 +444,13 @@ func extractMethods(file *ast.File, typeName string) []MethodInfo {
 				recvType := exprToString(recv.Type)
 				if strings.Contains(recvType, typeName) {
 					sig := funcSignature(fn.Type)
+					pos := fset.Position(fn.Name.Pos())
 					methods = append(methods, MethodInfo{
 						Name:      fn.Name.Name,
 						Signature: sig,
 						Receiver:  recvType,
 						Exported:  ast.IsExported(fn.Name.Name),
+						Position:  newPosition(pos),
 					})
 				}
 			}

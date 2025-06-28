@@ -91,6 +91,101 @@ func main() {
 	)
 	mcpServer.AddTool(listPackagesTool, listPackagesHandler)
 
+	// Define the find_imports tool
+	findImportsTool := mcp.NewTool("find_imports",
+		mcp.WithDescription("Analyze import usage and find unused imports"),
+		mcp.WithString("dir",
+			mcp.Description("Directory to search (default: current directory)"),
+		),
+	)
+	mcpServer.AddTool(findImportsTool, findImportsHandler)
+
+	// Define the find_function_calls tool
+	findFunctionCallsTool := mcp.NewTool("find_function_calls",
+		mcp.WithDescription("Find all calls to a specific function"),
+		mcp.WithString("dir",
+			mcp.Description("Directory to search (default: current directory)"),
+		),
+		mcp.WithString("function",
+			mcp.Required(),
+			mcp.Description("Function name to find calls for"),
+		),
+	)
+	mcpServer.AddTool(findFunctionCallsTool, findFunctionCallsHandler)
+
+	// Define the find_struct_usage tool
+	findStructUsageTool := mcp.NewTool("find_struct_usage",
+		mcp.WithDescription("Find struct instantiations and field access patterns"),
+		mcp.WithString("dir",
+			mcp.Description("Directory to search (default: current directory)"),
+		),
+		mcp.WithString("struct",
+			mcp.Required(),
+			mcp.Description("Struct name to analyze usage for"),
+		),
+	)
+	mcpServer.AddTool(findStructUsageTool, findStructUsageHandler)
+
+	// Define the extract_interfaces tool
+	extractInterfacesTool := mcp.NewTool("extract_interfaces",
+		mcp.WithDescription("Find types implementing an interface or suggest interfaces"),
+		mcp.WithString("dir",
+			mcp.Description("Directory to search (default: current directory)"),
+		),
+		mcp.WithString("interface",
+			mcp.Description("Interface name to find implementations for (if empty, lists all interfaces)"),
+		),
+	)
+	mcpServer.AddTool(extractInterfacesTool, extractInterfacesHandler)
+
+	// Define the find_errors tool
+	findErrorsTool := mcp.NewTool("find_errors",
+		mcp.WithDescription("Find error handling patterns and unhandled errors"),
+		mcp.WithString("dir",
+			mcp.Description("Directory to search (default: current directory)"),
+		),
+	)
+	mcpServer.AddTool(findErrorsTool, findErrorsHandler)
+
+	// Define the analyze_tests tool
+	analyzeTestsTool := mcp.NewTool("analyze_tests",
+		mcp.WithDescription("Analyze test coverage and find untested exported functions"),
+		mcp.WithString("dir",
+			mcp.Description("Directory to search (default: current directory)"),
+		),
+	)
+	mcpServer.AddTool(analyzeTestsTool, analyzeTestsHandler)
+
+	// Define the find_comments tool
+	findCommentsTool := mcp.NewTool("find_comments",
+		mcp.WithDescription("Find undocumented exports, TODOs, and analyze comments"),
+		mcp.WithString("dir",
+			mcp.Description("Directory to search (default: current directory)"),
+		),
+		mcp.WithString("type",
+			mcp.Description("Comment type to find: 'todo', 'undocumented', or 'all' (default: 'all')"),
+		),
+	)
+	mcpServer.AddTool(findCommentsTool, findCommentsHandler)
+
+	// Define the analyze_dependencies tool
+	analyzeDependenciesTool := mcp.NewTool("analyze_dependencies",
+		mcp.WithDescription("Analyze package dependencies and find cycles"),
+		mcp.WithString("dir",
+			mcp.Description("Directory to search (default: current directory)"),
+		),
+	)
+	mcpServer.AddTool(analyzeDependenciesTool, analyzeDependenciesHandler)
+
+	// Define the find_generics tool
+	findGenericsTool := mcp.NewTool("find_generics",
+		mcp.WithDescription("Find generic types, functions and their instantiations"),
+		mcp.WithString("dir",
+			mcp.Description("Directory to search (default: current directory)"),
+		),
+	)
+	mcpServer.AddTool(findGenericsTool, findGenericsHandler)
+
 	// Start the server
 	if err := server.ServeStdio(mcpServer); err != nil {
 		fmt.Fprintf(os.Stderr, "Server error: %v\n", err)
@@ -242,6 +337,160 @@ func listPackagesHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp
 	jsonData, err := json.Marshal(packages)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal packages: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+func findImportsHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	dir := request.GetString("dir", "./")
+
+	imports, err := findImports(dir)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to analyze imports: %v", err)), nil
+	}
+
+	jsonData, err := json.Marshal(imports)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal imports: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+func findFunctionCallsHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	dir := request.GetString("dir", "./")
+	function, err := request.RequireString("function")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	calls, err := findFunctionCalls(dir, function)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to find function calls: %v", err)), nil
+	}
+
+	jsonData, err := json.Marshal(calls)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal calls: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+func findStructUsageHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	dir := request.GetString("dir", "./")
+	structName, err := request.RequireString("struct")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	usage, err := findStructUsage(dir, structName)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to find struct usage: %v", err)), nil
+	}
+
+	jsonData, err := json.Marshal(usage)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal usage: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+func extractInterfacesHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	dir := request.GetString("dir", "./")
+	interfaceName := request.GetString("interface", "")
+
+	interfaces, err := extractInterfaces(dir, interfaceName)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to extract interfaces: %v", err)), nil
+	}
+
+	jsonData, err := json.Marshal(interfaces)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal interfaces: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+func findErrorsHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	dir := request.GetString("dir", "./")
+
+	errors, err := findErrors(dir)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to find errors: %v", err)), nil
+	}
+
+	jsonData, err := json.Marshal(errors)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal errors: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+func analyzeTestsHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	dir := request.GetString("dir", "./")
+
+	analysis, err := analyzeTests(dir)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to analyze tests: %v", err)), nil
+	}
+
+	jsonData, err := json.Marshal(analysis)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal analysis: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+func findCommentsHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	dir := request.GetString("dir", "./")
+	commentType := request.GetString("type", "all")
+
+	comments, err := findComments(dir, commentType)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to find comments: %v", err)), nil
+	}
+
+	jsonData, err := json.Marshal(comments)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal comments: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+func analyzeDependenciesHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	dir := request.GetString("dir", "./")
+
+	deps, err := analyzeDependencies(dir)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to analyze dependencies: %v", err)), nil
+	}
+
+	jsonData, err := json.Marshal(deps)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal dependencies: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+func findGenericsHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	dir := request.GetString("dir", "./")
+
+	generics, err := findGenerics(dir)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to find generics: %v", err)), nil
+	}
+
+	jsonData, err := json.Marshal(generics)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal generics: %v", err)), nil
 	}
 
 	return mcp.NewToolResultText(string(jsonData)), nil
