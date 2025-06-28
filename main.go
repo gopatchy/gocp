@@ -169,7 +169,7 @@ func main() {
 		mcp.WithString("filter",
 			mcp.Description("Optional regex to filter comments (applies to 'todo' and 'all' types)"),
 		),
-		mcp.WithBool("include_context",
+		mcp.WithBoolean("include_context",
 			mcp.Description("Include surrounding lines of code as context (default: false)"),
 		),
 	)
