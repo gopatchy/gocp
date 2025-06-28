@@ -186,6 +186,138 @@ func main() {
 	)
 	mcpServer.AddTool(findGenericsTool, findGenericsHandler)
 
+	// Define the find_dead_code tool
+	findDeadCodeTool := mcp.NewTool("find_dead_code",
+		mcp.WithDescription("Find unreachable code, unused variables, and dead branches"),
+		mcp.WithString("dir",
+			mcp.Description("Directory to search (default: current directory)"),
+		),
+	)
+	mcpServer.AddTool(findDeadCodeTool, findDeadCodeHandler)
+
+	// Define the find_duplicates tool
+	findDuplicatesTool := mcp.NewTool("find_duplicates",
+		mcp.WithDescription("Detect code duplication and similar function patterns"),
+		mcp.WithString("dir",
+			mcp.Description("Directory to search (default: current directory)"),
+		),
+		mcp.WithNumber("threshold",
+			mcp.Description("Similarity threshold (0.0-1.0, default: 0.8)"),
+		),
+	)
+	mcpServer.AddTool(findDuplicatesTool, findDuplicatesHandler)
+
+	// Define the find_inefficiencies tool
+	findInefficienciesTool := mcp.NewTool("find_inefficiencies",
+		mcp.WithDescription("Find performance inefficiencies like string concatenation in loops"),
+		mcp.WithString("dir",
+			mcp.Description("Directory to search (default: current directory)"),
+		),
+	)
+	mcpServer.AddTool(findInefficienciesTool, findInefficienciesHandler)
+
+	// Define the extract_api tool
+	extractApiTool := mcp.NewTool("extract_api",
+		mcp.WithDescription("Extract public API surface and detect breaking changes"),
+		mcp.WithString("dir",
+			mcp.Description("Directory to search (default: current directory)"),
+		),
+	)
+	mcpServer.AddTool(extractApiTool, extractApiHandler)
+
+	// Define the generate_docs tool
+	generateDocsTool := mcp.NewTool("generate_docs",
+		mcp.WithDescription("Auto-generate documentation from code structure"),
+		mcp.WithString("dir",
+			mcp.Description("Directory to search (default: current directory)"),
+		),
+		mcp.WithString("format",
+			mcp.Description("Output format: 'markdown' or 'json' (default: 'markdown')"),
+		),
+	)
+	mcpServer.AddTool(generateDocsTool, generateDocsHandler)
+
+	// Define the find_deprecated tool
+	findDeprecatedTool := mcp.NewTool("find_deprecated",
+		mcp.WithDescription("Find deprecated usage and suggest alternatives"),
+		mcp.WithString("dir",
+			mcp.Description("Directory to search (default: current directory)"),
+		),
+	)
+	mcpServer.AddTool(findDeprecatedTool, findDeprecatedHandler)
+
+	// Define the analyze_coupling tool
+	analyzeCouplingTool := mcp.NewTool("analyze_coupling",
+		mcp.WithDescription("Analyze package/module coupling and suggest refactoring"),
+		mcp.WithString("dir",
+			mcp.Description("Directory to search (default: current directory)"),
+		),
+	)
+	mcpServer.AddTool(analyzeCouplingTool, analyzeCouplingHandler)
+
+	// Define the find_patterns tool
+	findPatternsTool := mcp.NewTool("find_patterns",
+		mcp.WithDescription("Find design patterns usage (singleton, factory, etc.)"),
+		mcp.WithString("dir",
+			mcp.Description("Directory to search (default: current directory)"),
+		),
+	)
+	mcpServer.AddTool(findPatternsTool, findPatternsHandler)
+
+	// Define the analyze_architecture tool
+	analyzeArchitectureTool := mcp.NewTool("analyze_architecture",
+		mcp.WithDescription("Analyze layer violations and dependency direction"),
+		mcp.WithString("dir",
+			mcp.Description("Directory to search (default: current directory)"),
+		),
+	)
+	mcpServer.AddTool(analyzeArchitectureTool, analyzeArchitectureHandler)
+
+	// Define the analyze_go_idioms tool
+	analyzeGoIdiomsTool := mcp.NewTool("analyze_go_idioms",
+		mcp.WithDescription("Check for idiomatic Go patterns and suggest improvements"),
+		mcp.WithString("dir",
+			mcp.Description("Directory to search (default: current directory)"),
+		),
+	)
+	mcpServer.AddTool(analyzeGoIdiomsTool, analyzeGoIdiomsHandler)
+
+	// Define the find_context_usage tool
+	findContextUsageTool := mcp.NewTool("find_context_usage",
+		mcp.WithDescription("Analyze Context.Context usage patterns and find missing contexts"),
+		mcp.WithString("dir",
+			mcp.Description("Directory to search (default: current directory)"),
+		),
+	)
+	mcpServer.AddTool(findContextUsageTool, findContextUsageHandler)
+
+	// Define the analyze_embedding tool
+	analyzeEmbeddingTool := mcp.NewTool("analyze_embedding",
+		mcp.WithDescription("Analyze interface and struct embedding patterns"),
+		mcp.WithString("dir",
+			mcp.Description("Directory to search (default: current directory)"),
+		),
+	)
+	mcpServer.AddTool(analyzeEmbeddingTool, analyzeEmbeddingHandler)
+
+	// Define the analyze_test_quality tool
+	analyzeTestQualityTool := mcp.NewTool("analyze_test_quality",
+		mcp.WithDescription("Analyze test patterns, assertion quality, and mock usage"),
+		mcp.WithString("dir",
+			mcp.Description("Directory to search (default: current directory)"),
+		),
+	)
+	mcpServer.AddTool(analyzeTestQualityTool, analyzeTestQualityHandler)
+
+	// Define the find_missing_tests tool
+	findMissingTestsTool := mcp.NewTool("find_missing_tests",
+		mcp.WithDescription("Find missing tests based on complexity and criticality"),
+		mcp.WithString("dir",
+			mcp.Description("Directory to search (default: current directory)"),
+		),
+	)
+	mcpServer.AddTool(findMissingTestsTool, findMissingTestsHandler)
+
 	// Start the server
 	if err := server.ServeStdio(mcpServer); err != nil {
 		fmt.Fprintf(os.Stderr, "Server error: %v\n", err)
@@ -491,6 +623,236 @@ func findGenericsHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp
 	jsonData, err := json.Marshal(generics)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal generics: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+func findDeadCodeHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	dir := request.GetString("dir", "./")
+
+	deadCode, err := findDeadCode(dir)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to find dead code: %v", err)), nil
+	}
+
+	jsonData, err := json.Marshal(deadCode)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal dead code: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+func findDuplicatesHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	dir := request.GetString("dir", "./")
+	threshold := request.GetFloat("threshold", 0.8)
+
+	duplicates, err := findDuplicates(dir, threshold)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to find duplicates: %v", err)), nil
+	}
+
+	jsonData, err := json.Marshal(duplicates)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal duplicates: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+func findInefficienciesHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	dir := request.GetString("dir", "./")
+
+	inefficiencies, err := findInefficiencies(dir)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to find inefficiencies: %v", err)), nil
+	}
+
+	jsonData, err := json.Marshal(inefficiencies)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal inefficiencies: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+func extractApiHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	dir := request.GetString("dir", "./")
+
+	api, err := extractApi(dir)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to extract API: %v", err)), nil
+	}
+
+	jsonData, err := json.Marshal(api)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal API: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+func generateDocsHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	dir := request.GetString("dir", "./")
+	format := request.GetString("format", "markdown")
+
+	docs, err := generateDocs(dir, format)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to generate docs: %v", err)), nil
+	}
+
+	if format == "markdown" {
+		return mcp.NewToolResultText(docs.(string)), nil
+	}
+
+	jsonData, err := json.Marshal(docs)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal docs: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+func findDeprecatedHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	dir := request.GetString("dir", "./")
+
+	deprecated, err := findDeprecated(dir)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to find deprecated: %v", err)), nil
+	}
+
+	jsonData, err := json.Marshal(deprecated)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal deprecated: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+func analyzeCouplingHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	dir := request.GetString("dir", "./")
+
+	coupling, err := analyzeCoupling(dir)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to analyze coupling: %v", err)), nil
+	}
+
+	jsonData, err := json.Marshal(coupling)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal coupling: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+func findPatternsHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	dir := request.GetString("dir", "./")
+
+	patterns, err := findPatterns(dir)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to find patterns: %v", err)), nil
+	}
+
+	jsonData, err := json.Marshal(patterns)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal patterns: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+func analyzeArchitectureHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	dir := request.GetString("dir", "./")
+
+	architecture, err := analyzeArchitecture(dir)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to analyze architecture: %v", err)), nil
+	}
+
+	jsonData, err := json.Marshal(architecture)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal architecture: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+func analyzeGoIdiomsHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	dir := request.GetString("dir", "./")
+
+	idioms, err := analyzeGoIdioms(dir)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to analyze Go idioms: %v", err)), nil
+	}
+
+	jsonData, err := json.Marshal(idioms)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal idioms: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+func findContextUsageHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	dir := request.GetString("dir", "./")
+
+	contextUsage, err := findContextUsage(dir)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to find context usage: %v", err)), nil
+	}
+
+	jsonData, err := json.Marshal(contextUsage)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal context usage: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+func analyzeEmbeddingHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	dir := request.GetString("dir", "./")
+
+	embedding, err := analyzeEmbedding(dir)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to analyze embedding: %v", err)), nil
+	}
+
+	jsonData, err := json.Marshal(embedding)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal embedding: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+func analyzeTestQualityHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	dir := request.GetString("dir", "./")
+
+	testQuality, err := analyzeTestQuality(dir)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to analyze test quality: %v", err)), nil
+	}
+
+	jsonData, err := json.Marshal(testQuality)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal test quality: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+func findMissingTestsHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	dir := request.GetString("dir", "./")
+
+	missingTests, err := findMissingTests(dir)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to find missing tests: %v", err)), nil
+	}
+
+	jsonData, err := json.Marshal(missingTests)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal missing tests: %v", err)), nil
 	}
 
 	return mcp.NewToolResultText(string(jsonData)), nil
