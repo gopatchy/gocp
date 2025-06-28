@@ -169,6 +169,9 @@ func main() {
 		mcp.WithString("filter",
 			mcp.Description("Optional regex to filter comments (applies to 'todo' and 'all' types)"),
 		),
+		mcp.WithBool("include_context",
+			mcp.Description("Include surrounding lines of code as context (default: false)"),
+		),
 	)
 	mcpServer.AddTool(findCommentsTool, findCommentsHandler)
 
@@ -682,8 +685,9 @@ func findCommentsHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp
 	dir := request.GetString("dir", "./")
 	commentType := request.GetString("type", "all")
 	filter := request.GetString("filter", "")
+	includeContext := request.GetBool("include_context", false)
 
-	comments, err := findComments(dir, commentType, filter)
+	comments, err := findComments(dir, commentType, filter, includeContext)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("failed to find comments: %v", err)), nil
 	}

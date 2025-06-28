@@ -27,6 +27,12 @@ type SearchMatch struct {
 	Column     int    `json:"column"`
 	Text       string `json:"text"`
 	Context    string `json:"context,omitempty"`
+	StartLine  int    `json:"start_line"`
+	StartCol   int    `json:"start_col"`
+	EndLine    int    `json:"end_line"`
+	EndCol     int    `json:"end_col"`
+	StartByte  int    `json:"start_byte"`
+	EndByte    int    `json:"end_byte"`
 }
 
 func searchReplace(paths []string, pattern string, replacement *string, useRegex, caseInsensitive bool, includeContext bool, beforePattern, afterPattern string) (*SearchReplaceResult, error) {
@@ -247,10 +253,42 @@ func processFile(path string, searchFunc func(string) [][]int, replaceFunc func(
 		}
 		column := match[0] - lineStart + 1
 		
+		// Calculate end position
+		endLineNum := lineNum
+		endColumn := column + len(content[match[0]:match[1]])
+		
+		// Check if match spans multiple lines
+		matchText := content[match[0]:match[1]]
+		newlineCount := strings.Count(matchText, "\n")
+		if newlineCount > 0 {
+			// Find the end line
+			for i := lineNum; i < len(lineStarts); i++ {
+				if match[1] <= lineStarts[i] {
+					endLineNum = i
+					break
+				} else if i == len(lineStarts)-1 {
+					endLineNum = len(lines)
+				}
+			}
+			
+			// Calculate end column on the last line
+			endLineStart := 0
+			if endLineNum > 0 && endLineNum <= len(lineStarts) {
+				endLineStart = lineStarts[endLineNum-1]
+			}
+			endColumn = match[1] - endLineStart + 1
+		}
+		
 		searchMatch := SearchMatch{
-			Line:   lineNum,
-			Column: column,
-			Text:   content[match[0]:match[1]],
+			Line:      lineNum,
+			Column:    column,
+			Text:      matchText,
+			StartLine: lineNum,
+			StartCol:  column,
+			EndLine:   endLineNum,
+			EndCol:    endColumn,
+			StartByte: match[0],
+			EndByte:   match[1],
 		}
 		
 		if includeContext && lineNum > 0 && lineNum <= len(lines) {

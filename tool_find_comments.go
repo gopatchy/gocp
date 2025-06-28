@@ -4,6 +4,7 @@ import (
 	"go/ast"
 	"go/token"
 	"regexp"
+	"strings"
 )
 
 // Comment analysis types
@@ -18,9 +19,29 @@ type CommentItem struct {
 	Comment  string   `json:"comment,omitempty"`
 	Type     string   `json:"type"`
 	Position Position `json:"position"`
+	Context  []string `json:"context,omitempty"`
 }
 
-func findComments(dir string, commentType string, filter string) ([]CommentInfo, error) {
+func getContext(src []byte, pos token.Position, contextLines int) []string {
+	lines := strings.Split(string(src), "\n")
+	startLine := pos.Line - contextLines - 1
+	endLine := pos.Line + contextLines - 1
+	
+	if startLine < 0 {
+		startLine = 0
+	}
+	if endLine >= len(lines) {
+		endLine = len(lines) - 1
+	}
+	
+	var context []string
+	for i := startLine; i <= endLine; i++ {
+		context = append(context, lines[i])
+	}
+	return context
+}
+
+func findComments(dir string, commentType string, filter string, includeContext bool) ([]CommentInfo, error) {
 	var comments []CommentInfo
 
 	err := walkGoFiles(dir, func(path string, src []byte, file *ast.File, fset *token.FileSet) error {
@@ -47,11 +68,15 @@ func findComments(dir string, commentType string, filter string) ([]CommentInfo,
 					// If no filter or filter matches, include the comment
 					if filterRegex == nil || filterRegex.MatchString(c.Text) {
 						pos := fset.Position(c.Pos())
-						info.TODOs = append(info.TODOs, CommentItem{
+						item := CommentItem{
 							Comment:  c.Text,
 							Type:     "comment",
 							Position: newPosition(pos),
-						})
+						}
+						if includeContext {
+							item.Context = getContext(src, pos, 3)
+						}
+						info.TODOs = append(info.TODOs, item)
 					}
 				}
 			}
@@ -64,11 +89,15 @@ func findComments(dir string, commentType string, filter string) ([]CommentInfo,
 				case *ast.FuncDecl:
 					if ast.IsExported(x.Name.Name) && x.Doc == nil {
 						pos := fset.Position(x.Pos())
-						info.Undocumented = append(info.Undocumented, CommentItem{
+						item := CommentItem{
 							Name:     x.Name.Name,
 							Type:     "function",
 							Position: newPosition(pos),
-						})
+						}
+						if includeContext {
+							item.Context = getContext(src, pos, 3)
+						}
+						info.Undocumented = append(info.Undocumented, item)
 					}
 				case *ast.GenDecl:
 					for _, spec := range x.Specs {
@@ -76,21 +105,29 @@ func findComments(dir string, commentType string, filter string) ([]CommentInfo,
 						case *ast.TypeSpec:
 							if ast.IsExported(s.Name.Name) && x.Doc == nil && s.Doc == nil {
 								pos := fset.Position(s.Pos())
-								info.Undocumented = append(info.Undocumented, CommentItem{
+								item := CommentItem{
 									Name:     s.Name.Name,
 									Type:     "type",
 									Position: newPosition(pos),
-								})
+								}
+								if includeContext {
+									item.Context = getContext(src, pos, 3)
+								}
+								info.Undocumented = append(info.Undocumented, item)
 							}
 						case *ast.ValueSpec:
 							for _, name := range s.Names {
 								if ast.IsExported(name.Name) && x.Doc == nil && s.Doc == nil {
 									pos := fset.Position(name.Pos())
-									info.Undocumented = append(info.Undocumented, CommentItem{
+									item := CommentItem{
 										Name:     name.Name,
 										Type:     "value",
 										Position: newPosition(pos),
-									})
+									}
+									if includeContext {
+										item.Context = getContext(src, pos, 3)
+									}
+									info.Undocumented = append(info.Undocumented, item)
 								}
 							}
 						}
