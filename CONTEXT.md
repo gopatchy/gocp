@@ -16,17 +16,74 @@
 gocp is a Go MCP (Model Context Protocol) server that provides tools for building and executing Go code. It uses the go-mcp library to implement the MCP protocol.
 
 ## Key Files
-- `main.go`: MCP server implementation with build_and_run_go tool
+- `main.go`: MCP server implementation with tools and handlers
+- `ast.go`: Go AST parsing and code analysis functionality
 - `go.mod`: Module definition with go-mcp dependency
 
 ## Tool Details
-- **build_and_run_go**: Executes Go code using `go run`
-  - Parameters:
-    - `code` (required): Go source code to execute
-    - `timeout` (optional): Timeout in seconds (default: 30)
-  - Returns JSON with:
-    - `stdout`: Standard output
-    - `stderr`: Standard error
-    - `exit_code`: Process exit code
-    - `error`: Error message if any
-  - Creates temporary directories with `gocp-*` prefix
+
+### build_and_run_go
+Executes Go code using `go run`
+- Parameters:
+  - `code` (required): Go source code to execute
+  - `timeout` (optional): Timeout in seconds (default: 30)
+- Returns JSON with:
+  - `stdout`: Standard output
+  - `stderr`: Standard error
+  - `exit_code`: Process exit code
+  - `error`: Error message if any
+- Creates temporary directories with `gocp-*` prefix
+
+### find_symbols
+Find all functions, types, interfaces, constants, and variables by name/pattern
+- Parameters:
+  - `dir` (optional): Directory to search (default: current directory)
+  - `pattern` (optional): Symbol name pattern to search for (case-insensitive substring match)
+- Returns JSON array of symbols with:
+  - `name`: Symbol name
+  - `type`: Symbol type (function, struct, interface, constant, variable)
+  - `package`: Package name
+  - `file`: File path
+  - `line`: Line number
+  - `column`: Column number
+  - `exported`: Whether the symbol is exported
+
+### get_type_info
+Get detailed information about a type including fields, methods, and embedded types
+- Parameters:
+  - `dir` (optional): Directory to search (default: current directory)
+  - `type` (required): Type name to get information for
+- Returns JSON with:
+  - `name`: Type name
+  - `package`: Package name
+  - `file`: File path
+  - `line`: Line number
+  - `kind`: Type kind (struct, interface, alias, other)
+  - `fields`: Array of field information (for structs)
+  - `methods`: Array of methods
+  - `embedded`: Array of embedded type names
+  - `interface`: Array of interface methods (for interfaces)
+  - `underlying`: Underlying type (for aliases)
+
+### find_references
+Find all references to a symbol (function calls, type usage, etc.)
+- Parameters:
+  - `dir` (optional): Directory to search (default: current directory)
+  - `symbol` (required): Symbol name to find references for
+- Returns JSON array of references with:
+  - `file`: File path
+  - `line`: Line number
+  - `column`: Column number
+  - `context`: Code context around the reference
+  - `kind`: Reference kind (identifier, selector)
+
+### list_packages
+List all Go packages in directory tree
+- Parameters:
+  - `dir` (optional): Directory to search (default: current directory)
+- Returns JSON array of packages with:
+  - `import_path`: Import path relative to search directory
+  - `name`: Package name
+  - `dir`: Directory path
+  - `go_files`: List of Go source files
+  - `imports`: List of imported packages
