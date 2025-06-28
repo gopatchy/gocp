@@ -34,7 +34,7 @@ func findErrors(dir string) ([]ErrorInfo, error) {
 			case *ast.ExprStmt:
 				if call, ok := x.X.(*ast.CallExpr); ok {
 					// Check if this function likely returns an error
-					if returnsError(call, file) {
+					if callReturnsError(call) {
 						pos := fset.Position(call.Pos())
 						context := extractContext(src, pos)
 						info.UnhandledErrors = append(info.UnhandledErrors, ErrorContext{
@@ -84,7 +84,7 @@ func findErrors(dir string) ([]ErrorInfo, error) {
 	return errors, err
 }
 
-func returnsError(call *ast.CallExpr, file *ast.File) bool {
+func callReturnsError(call *ast.CallExpr) bool {
 	// Simple heuristic: check if the function name suggests it returns an error
 	switch fun := call.Fun.(type) {
 	case *ast.Ident:

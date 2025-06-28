@@ -423,6 +423,137 @@ func main() {
 	)
 	mcpServer.AddTool(searchReplaceTool, searchReplaceHandler)
 
+	// Define the find_method_receivers tool
+	findMethodReceiversTool := mcp.NewTool("find_method_receivers",
+		mcp.WithDescription("Track pointer vs value receivers inconsistencies and suggest standardization"),
+		mcp.WithString("dir",
+			mcp.Description("Directory to search (default: current directory)"),
+		),
+	)
+	mcpServer.AddTool(findMethodReceiversTool, findMethodReceiversHandler)
+
+	// Define the analyze_goroutines tool
+	analyzeGoroutinesTool := mcp.NewTool("analyze_goroutines",
+		mcp.WithDescription("Find goroutine leaks, missing waitgroups, and unsafe concurrent access patterns"),
+		mcp.WithString("dir",
+			mcp.Description("Directory to search (default: current directory)"),
+		),
+	)
+	mcpServer.AddTool(analyzeGoroutinesTool, analyzeGoroutinesHandler)
+
+	// Define the find_panic_recover tool
+	findPanicRecoverTool := mcp.NewTool("find_panic_recover",
+		mcp.WithDescription("Locate panic/recover patterns and suggest error handling improvements"),
+		mcp.WithString("dir",
+			mcp.Description("Directory to search (default: current directory)"),
+		),
+	)
+	mcpServer.AddTool(findPanicRecoverTool, findPanicRecoverHandler)
+
+	// Define the analyze_channels tool
+	analyzeChannelsTool := mcp.NewTool("analyze_channels",
+		mcp.WithDescription("Detect channel deadlocks, unbuffered channel issues, and goroutine communication patterns"),
+		mcp.WithString("dir",
+			mcp.Description("Directory to search (default: current directory)"),
+		),
+	)
+	mcpServer.AddTool(analyzeChannelsTool, analyzeChannelsHandler)
+
+	// Define the find_type_assertions tool
+	findTypeAssertionsTool := mcp.NewTool("find_type_assertions",
+		mcp.WithDescription("Find unsafe type assertions without ok checks"),
+		mcp.WithString("dir",
+			mcp.Description("Directory to search (default: current directory)"),
+		),
+	)
+	mcpServer.AddTool(findTypeAssertionsTool, findTypeAssertionsHandler)
+
+	// Define the analyze_memory_allocations tool
+	analyzeMemoryAllocationsTool := mcp.NewTool("analyze_memory_allocations",
+		mcp.WithDescription("Identify excessive allocations, escaping variables, and suggest optimizations"),
+		mcp.WithString("dir",
+			mcp.Description("Directory to search (default: current directory)"),
+		),
+	)
+	mcpServer.AddTool(analyzeMemoryAllocationsTool, analyzeMemoryAllocationsHandler)
+
+	// Define the find_reflection_usage tool
+	findReflectionUsageTool := mcp.NewTool("find_reflection_usage",
+		mcp.WithDescription("Track reflect package usage for performance and type safety analysis"),
+		mcp.WithString("dir",
+			mcp.Description("Directory to search (default: current directory)"),
+		),
+	)
+	mcpServer.AddTool(findReflectionUsageTool, findReflectionUsageHandler)
+
+	// Define the find_init_functions tool
+	findInitFunctionsTool := mcp.NewTool("find_init_functions",
+		mcp.WithDescription("Track init() functions and their initialization order dependencies"),
+		mcp.WithString("dir",
+			mcp.Description("Directory to search (default: current directory)"),
+		),
+	)
+	mcpServer.AddTool(findInitFunctionsTool, findInitFunctionsHandler)
+
+	// Define the analyze_defer_patterns tool
+	analyzeDeferPatternsTool := mcp.NewTool("analyze_defer_patterns",
+		mcp.WithDescription("Find incorrect defer usage and resource leak risks"),
+		mcp.WithString("dir",
+			mcp.Description("Directory to search (default: current directory)"),
+		),
+	)
+	mcpServer.AddTool(analyzeDeferPatternsTool, analyzeDeferPatternsHandler)
+
+	// Define the find_empty_blocks tool
+	findEmptyBlocksTool := mcp.NewTool("find_empty_blocks",
+		mcp.WithDescription("Locate empty if/else/for blocks and suggest removal"),
+		mcp.WithString("dir",
+			mcp.Description("Directory to search (default: current directory)"),
+		),
+	)
+	mcpServer.AddTool(findEmptyBlocksTool, findEmptyBlocksHandler)
+
+	// Define the analyze_naming_conventions tool
+	analyzeNamingConventionsTool := mcp.NewTool("analyze_naming_conventions",
+		mcp.WithDescription("Check Go naming conventions (camelCase, exported names, etc.)"),
+		mcp.WithString("dir",
+			mcp.Description("Directory to search (default: current directory)"),
+		),
+	)
+	mcpServer.AddTool(analyzeNamingConventionsTool, analyzeNamingConventionsHandler)
+
+	// Define the go_run tool
+	goRunTool := mcp.NewTool("go_run",
+		mcp.WithDescription("Execute go run command with specified path and optional flags"),
+		mcp.WithString("path",
+			mcp.Required(),
+			mcp.Description("Path to Go file or package to run"),
+		),
+		mcp.WithString("flags",
+			mcp.Description("Optional flags for go run (space-separated)"),
+		),
+		mcp.WithNumber("timeout",
+			mcp.Description("Timeout in seconds (default: 30)"),
+		),
+	)
+	mcpServer.AddTool(goRunTool, goRunHandler)
+
+	// Define the go_test tool
+	goTestTool := mcp.NewTool("go_test",
+		mcp.WithDescription("Execute go test command with specified path and optional flags"),
+		mcp.WithString("path",
+			mcp.Required(),
+			mcp.Description("Path to Go package or directory to test"),
+		),
+		mcp.WithString("flags",
+			mcp.Description("Optional flags for go test (space-separated, e.g., '-v -cover -race')"),
+		),
+		mcp.WithNumber("timeout",
+			mcp.Description("Timeout in seconds (default: 60)"),
+		),
+	)
+	mcpServer.AddTool(goTestTool, goTestHandler)
+
 	// Start the server
 	if err := server.ServeStdio(mcpServer); err != nil {
 		fmt.Fprintf(os.Stderr, "Server error: %v\n", err)
@@ -1059,6 +1190,238 @@ func searchReplaceHandler(ctx context.Context, request mcp.CallToolRequest) (*mc
 	result, err := searchReplace(paths, pattern, replacement, useRegex, caseInsensitive, includeContext, beforePattern, afterPattern, replaceAll)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("search/replace failed: %v", err)), nil
+	}
+
+	jsonData, err := json.Marshal(result)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal result: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+func findMethodReceiversHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	dir := request.GetString("dir", "./")
+
+	analysis, err := findMethodReceivers(dir)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to analyze method receivers: %v", err)), nil
+	}
+
+	jsonData, err := json.Marshal(analysis)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal analysis: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+func analyzeGoroutinesHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	dir := request.GetString("dir", "./")
+
+	analysis, err := analyzeGoroutines(dir)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to analyze goroutines: %v", err)), nil
+	}
+
+	jsonData, err := json.Marshal(analysis)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal analysis: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+func findPanicRecoverHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	dir := request.GetString("dir", "./")
+
+	analysis, err := findPanicRecover(dir)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to find panic/recover: %v", err)), nil
+	}
+
+	jsonData, err := json.Marshal(analysis)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal analysis: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+func analyzeChannelsHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	dir := request.GetString("dir", "./")
+
+	analysis, err := analyzeChannels(dir)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to analyze channels: %v", err)), nil
+	}
+
+	jsonData, err := json.Marshal(analysis)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal analysis: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+func findTypeAssertionsHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	dir := request.GetString("dir", "./")
+
+	analysis, err := findTypeAssertions(dir)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to find type assertions: %v", err)), nil
+	}
+
+	jsonData, err := json.Marshal(analysis)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal analysis: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+func analyzeMemoryAllocationsHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	dir := request.GetString("dir", "./")
+
+	analysis, err := analyzeMemoryAllocations(dir)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to analyze memory allocations: %v", err)), nil
+	}
+
+	jsonData, err := json.Marshal(analysis)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal analysis: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+func findReflectionUsageHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	dir := request.GetString("dir", "./")
+
+	analysis, err := findReflectionUsage(dir)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to find reflection usage: %v", err)), nil
+	}
+
+	jsonData, err := json.Marshal(analysis)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal analysis: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+func findInitFunctionsHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	dir := request.GetString("dir", "./")
+
+	analysis, err := findInitFunctions(dir)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to find init functions: %v", err)), nil
+	}
+
+	jsonData, err := json.Marshal(analysis)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal analysis: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+func analyzeDeferPatternsHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	dir := request.GetString("dir", "./")
+
+	analysis, err := analyzeDeferPatterns(dir)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to analyze defer patterns: %v", err)), nil
+	}
+
+	jsonData, err := json.Marshal(analysis)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal analysis: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+func findEmptyBlocksHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	dir := request.GetString("dir", "./")
+
+	analysis, err := findEmptyBlocks(dir)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to find empty blocks: %v", err)), nil
+	}
+
+	jsonData, err := json.Marshal(analysis)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal analysis: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+func analyzeNamingConventionsHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	dir := request.GetString("dir", "./")
+
+	analysis, err := analyzeNamingConventions(dir)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to analyze naming conventions: %v", err)), nil
+	}
+
+	jsonData, err := json.Marshal(analysis)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal analysis: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+func goRunHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	path, err := request.RequireString("path")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	flagsStr := request.GetString("flags", "")
+	timeout := request.GetFloat("timeout", 30.0)
+
+	// Parse flags
+	var flags []string
+	if flagsStr != "" {
+		flags = strings.Fields(flagsStr)
+	}
+
+	result, err := goRun(path, flags, time.Duration(timeout)*time.Second)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to run go run: %v", err)), nil
+	}
+
+	jsonData, err := json.Marshal(result)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal result: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+func goTestHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	path, err := request.RequireString("path")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	flagsStr := request.GetString("flags", "")
+	timeout := request.GetFloat("timeout", 60.0)
+
+	// Parse flags
+	var flags []string
+	if flagsStr != "" {
+		flags = strings.Fields(flagsStr)
+	}
+
+	result, err := goTest(path, flags, time.Duration(timeout)*time.Second)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to run go test: %v", err)), nil
 	}
 
 	jsonData, err := json.Marshal(result)

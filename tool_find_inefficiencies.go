@@ -34,7 +34,7 @@ func findInefficiencies(dir string) ([]InefficiencyInfo, error) {
 			if forStmt, ok := n.(*ast.ForStmt); ok {
 				ast.Inspect(forStmt.Body, func(inner ast.Node) bool {
 					if binExpr, ok := inner.(*ast.BinaryExpr); ok && binExpr.Op == token.ADD {
-						if isStringType(binExpr.X) || isStringType(binExpr.Y) {
+						if ineffIsStringType(binExpr.X) || ineffIsStringType(binExpr.Y) {
 							pos := fset.Position(binExpr.Pos())
 							info.StringConcat = append(info.StringConcat, InefficiencyItem{
 								Type:        "string_concatenation_in_loop",
@@ -78,7 +78,7 @@ func findInefficiencies(dir string) ([]InefficiencyInfo, error) {
 	return inefficiencies, err
 }
 
-func isStringType(expr ast.Expr) bool {
+func ineffIsStringType(expr ast.Expr) bool {
 	if ident, ok := expr.(*ast.Ident); ok {
 		return ident.Name == "string"
 	}

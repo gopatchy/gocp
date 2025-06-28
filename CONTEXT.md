@@ -87,3 +87,33 @@ List all Go packages in directory tree
   - `dir`: Directory path
   - `go_files`: List of Go source files
   - `imports`: List of imported packages
+
+### go_run
+Execute go run command with specified path and optional flags
+- Parameters:
+  - `path` (required): Path to Go file or package to run
+  - `flags` (optional): Optional flags for go run (space-separated)
+  - `timeout` (optional): Timeout in seconds (default: 30)
+- Returns JSON with:
+  - `stdout`: Standard output from go run
+  - `stderr`: Standard error from go run
+  - `exit_code`: Process exit code
+  - `error`: Error message if any
+  - `command`: The full command that was executed
+  - `work_dir`: Working directory where command was run
+
+### go_test
+Execute go test command with specified path and optional flags
+- Parameters:
+  - `path` (required): Path to Go package or directory to test
+  - `flags` (optional): Optional flags for go test (space-separated, e.g., '-v -cover -race')
+  - `timeout` (optional): Timeout in seconds (default: 60)
+- Returns JSON with:
+  - `stdout`: Standard output from go test
+  - `stderr`: Standard error from go test
+  - `exit_code`: Process exit code
+  - `error`: Error message if any
+  - `command`: The full command that was executed
+  - `work_dir`: Working directory where command was run
+  - `passed`: Boolean indicating if tests passed
+  - `test_count`: Number of tests found (if detectable)
