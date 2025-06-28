@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -317,6 +318,95 @@ func main() {
 		),
 	)
 	mcpServer.AddTool(findMissingTestsTool, findMissingTestsHandler)
+
+	// Define the read_range tool
+	readRangeTool := mcp.NewTool("read_range",
+		mcp.WithDescription("Read file content by line/column or byte range"),
+		mcp.WithString("file",
+			mcp.Required(),
+			mcp.Description("File path to read from"),
+		),
+		mcp.WithNumber("start_line",
+			mcp.Description("Start line (1-based, use with end_line)"),
+		),
+		mcp.WithNumber("end_line",
+			mcp.Description("End line (1-based, inclusive)"),
+		),
+		mcp.WithNumber("start_col",
+			mcp.Description("Start column (1-based, optional)"),
+		),
+		mcp.WithNumber("end_col",
+			mcp.Description("End column (1-based, optional)"),
+		),
+		mcp.WithNumber("start_byte",
+			mcp.Description("Start byte offset (0-based, use with end_byte)"),
+		),
+		mcp.WithNumber("end_byte",
+			mcp.Description("End byte offset (0-based, exclusive)"),
+		),
+	)
+	mcpServer.AddTool(readRangeTool, readRangeHandler)
+
+	// Define the write_range tool
+	writeRangeTool := mcp.NewTool("write_range",
+		mcp.WithDescription("Write content to file at specific line/column or byte range"),
+		mcp.WithString("file",
+			mcp.Required(),
+			mcp.Description("File path to write to"),
+		),
+		mcp.WithString("content",
+			mcp.Required(),
+			mcp.Description("Content to write"),
+		),
+		mcp.WithNumber("start_line",
+			mcp.Description("Start line (1-based, use with end_line)"),
+		),
+		mcp.WithNumber("end_line",
+			mcp.Description("End line (1-based, inclusive)"),
+		),
+		mcp.WithNumber("start_col",
+			mcp.Description("Start column (1-based, optional)"),
+		),
+		mcp.WithNumber("end_col",
+			mcp.Description("End column (1-based, optional)"),
+		),
+		mcp.WithNumber("start_byte",
+			mcp.Description("Start byte offset (0-based, use with end_byte)"),
+		),
+		mcp.WithNumber("end_byte",
+			mcp.Description("End byte offset (0-based, exclusive)"),
+		),
+		mcp.WithString("confirm_old",
+			mcp.Description("Expected old content for confirmation before replacing"),
+		),
+	)
+	mcpServer.AddTool(writeRangeTool, writeRangeHandler)
+
+	// Define the search_replace tool
+	searchReplaceTool := mcp.NewTool("search_replace",
+		mcp.WithDescription("Search and optionally replace text in files using string or regex patterns"),
+		mcp.WithString("paths",
+			mcp.Required(),
+			mcp.Description("File/directory path or comma-separated paths to search"),
+		),
+		mcp.WithString("pattern",
+			mcp.Required(),
+			mcp.Description("Search pattern (string or regex)"),
+		),
+		mcp.WithString("replacement",
+			mcp.Description("Replacement text (omit for search-only)"),
+		),
+		mcp.WithBoolean("regex",
+			mcp.Description("Use regex pattern matching (default: false)"),
+		),
+		mcp.WithBoolean("case_insensitive",
+			mcp.Description("Case-insensitive matching (default: false)"),
+		),
+		mcp.WithBoolean("include_context",
+			mcp.Description("Include line context in search results (default: false)"),
+		),
+	)
+	mcpServer.AddTool(searchReplaceTool, searchReplaceHandler)
 
 	// Start the server
 	if err := server.ServeStdio(mcpServer); err != nil {
@@ -853,6 +943,104 @@ func findMissingTestsHandler(ctx context.Context, request mcp.CallToolRequest) (
 	jsonData, err := json.Marshal(missingTests)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal missing tests: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+func readRangeHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	file, err := request.RequireString("file")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	startLine := int(request.GetFloat("start_line", -1))
+	endLine := int(request.GetFloat("end_line", -1))
+	startCol := int(request.GetFloat("start_col", -1))
+	endCol := int(request.GetFloat("end_col", -1))
+	startByte := int(request.GetFloat("start_byte", -1))
+	endByte := int(request.GetFloat("end_byte", -1))
+
+	result, err := readRange(file, startLine, endLine, startCol, endCol, startByte, endByte)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to read range: %v", err)), nil
+	}
+
+	jsonData, err := json.Marshal(result)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal result: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+func writeRangeHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	file, err := request.RequireString("file")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	content, err := request.RequireString("content")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	startLine := int(request.GetFloat("start_line", -1))
+	endLine := int(request.GetFloat("end_line", -1))
+	startCol := int(request.GetFloat("start_col", -1))
+	endCol := int(request.GetFloat("end_col", -1))
+	startByte := int(request.GetFloat("start_byte", -1))
+	endByte := int(request.GetFloat("end_byte", -1))
+	confirmOld := request.GetString("confirm_old", "")
+
+	result, err := writeRange(file, content, startLine, endLine, startCol, endCol, startByte, endByte, confirmOld)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to write range: %v", err)), nil
+	}
+
+	jsonData, err := json.Marshal(result)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal result: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+func searchReplaceHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// For now, paths will be a single string
+	pathStr, err := request.RequireString("paths")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	
+	// Split paths by comma if multiple
+	paths := strings.Split(pathStr, ",")
+	for i := range paths {
+		paths[i] = strings.TrimSpace(paths[i])
+	}
+
+	pattern, err := request.RequireString("pattern")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	var replacement *string
+	if r := request.GetString("replacement", ""); r != "" {
+		replacement = &r
+	}
+
+	useRegex := request.GetBool("regex", false)
+	caseInsensitive := request.GetBool("case_insensitive", false)
+	includeContext := request.GetBool("include_context", false)
+
+	result, err := searchReplace(paths, pattern, replacement, useRegex, caseInsensitive, includeContext)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("search/replace failed: %v", err)), nil
+	}
+
+	jsonData, err := json.Marshal(result)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal result: %v", err)), nil
 	}
 
 	return mcp.NewToolResultText(string(jsonData)), nil
