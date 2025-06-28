@@ -35,7 +35,7 @@ type SearchMatch struct {
 	EndByte    int    `json:"end_byte"`
 }
 
-func searchReplace(paths []string, pattern string, replacement *string, useRegex, caseInsensitive bool, includeContext bool, beforePattern, afterPattern string) (*SearchReplaceResult, error) {
+func searchReplace(paths []string, pattern string, replacement *string, useRegex, caseInsensitive bool, includeContext bool, beforePattern, afterPattern string, replaceAll bool) (*SearchReplaceResult, error) {
 	result := &SearchReplaceResult{
 		Files: []FileSearchReplaceResult{},
 	}
@@ -75,6 +75,34 @@ func searchReplace(paths []string, pattern string, replacement *string, useRegex
 		}
 		
 		replaceFunc = func(text string) string {
+			if !replaceAll {
+				// Replace only first occurrence
+				loc := contextRe.FindStringSubmatchIndex(text)
+				if loc == nil {
+					return text
+				}
+				
+				submatches := contextRe.FindStringSubmatch(text)
+				// Rebuild the match with the target replaced
+				result := ""
+				if beforePattern != "" && len(submatches) > 1 {
+					result += submatches[1] // before part
+				}
+				result += *replacement // replacement for target
+				if afterPattern != "" {
+					// The after part is at index 3 if before exists, otherwise at index 2
+					afterIndex := 2
+					if beforePattern != "" {
+						afterIndex = 3
+					}
+					if len(submatches) > afterIndex {
+						result += submatches[afterIndex]
+					}
+				}
+				
+				return text[:loc[0]] + result + text[loc[1]:]
+			}
+			
 			return contextRe.ReplaceAllStringFunc(text, func(match string) string {
 				submatches := contextRe.FindStringSubmatch(match)
 				
@@ -111,6 +139,14 @@ func searchReplace(paths []string, pattern string, replacement *string, useRegex
 		}
 		if replacement != nil {
 			replaceFunc = func(text string) string {
+				if !replaceAll {
+					// Replace only first occurrence
+					loc := re.FindStringIndex(text)
+					if loc == nil {
+						return text
+					}
+					return text[:loc[0]] + string(re.ExpandString([]byte{}, *replacement, text, re.FindStringSubmatchIndex(text))) + text[loc[1]:]
+				}
 				return re.ReplaceAllString(text, *replacement)
 			}
 		}
@@ -139,6 +175,13 @@ func searchReplace(paths []string, pattern string, replacement *string, useRegex
 		}
 		if replacement != nil {
 			replaceFunc = func(text string) string {
+				if !replaceAll {
+					// Replace only first occurrence
+					if caseInsensitive {
+						return caseInsensitiveReplaceFirst(text, pattern, *replacement)
+					}
+					return strings.Replace(text, pattern, *replacement, 1)
+				}
 				if caseInsensitive {
 					// Case-insensitive string replacement
 					return caseInsensitiveReplace(text, pattern, *replacement)
@@ -170,7 +213,7 @@ func searchReplace(paths []string, pattern string, replacement *string, useRegex
 					return nil
 				}
 
-				fileResult := processFile(filePath, searchFunc, replaceFunc, includeContext)
+				fileResult := processFile(filePath, searchFunc, replaceFunc, includeContext, replaceAll)
 				if len(fileResult.Matches) > 0 || fileResult.Replaced > 0 || fileResult.Error != "" {
 					result.Files = append(result.Files, fileResult)
 					result.TotalMatches += len(fileResult.Matches)
@@ -183,7 +226,7 @@ func searchReplace(paths []string, pattern string, replacement *string, useRegex
 			}
 		} else {
 			// Process single file
-			fileResult := processFile(path, searchFunc, replaceFunc, includeContext)
+			fileResult := processFile(path, searchFunc, replaceFunc, includeContext, replaceAll)
 			if len(fileResult.Matches) > 0 || fileResult.Replaced > 0 || fileResult.Error != "" {
 				result.Files = append(result.Files, fileResult)
 				result.TotalMatches += len(fileResult.Matches)
@@ -196,7 +239,7 @@ func searchReplace(paths []string, pattern string, replacement *string, useRegex
 }
 
 
-func processFile(path string, searchFunc func(string) [][]int, replaceFunc func(string) string, includeContext bool) FileSearchReplaceResult {
+func processFile(path string, searchFunc func(string) [][]int, replaceFunc func(string) string, includeContext bool, replaceAll bool) FileSearchReplaceResult {
 	result := FileSearchReplaceResult{
 		Path: path,
 	}
@@ -213,7 +256,14 @@ func processFile(path string, searchFunc func(string) [][]int, replaceFunc func(
 	// If replacement is requested, do it
 	if replaceFunc != nil {
 		matches := searchFunc(content)
-		result.Replaced = len(matches)
+		if replaceAll {
+			result.Replaced = len(matches)
+		} else {
+			// Only replacing first occurrence
+			if len(matches) > 0 {
+				result.Replaced = 1
+			}
+		}
 		
 		if result.Replaced > 0 {
 			newContent := replaceFunc(content)
@@ -321,6 +371,19 @@ func caseInsensitiveReplace(text, old, new string) string {
 	}
 	
 	return result.String()
+}
+
+func caseInsensitiveReplaceFirst(text, old, new string) string {
+	// Case-insensitive replacement for first occurrence only
+	lowerText := strings.ToLower(text)
+	lowerOld := strings.ToLower(old)
+	
+	idx := strings.Index(lowerText, lowerOld)
+	if idx < 0 {
+		return text
+	}
+	
+	return text[:idx] + new + text[idx+len(old):]
 }
 
 func isTextFile(path string) bool {

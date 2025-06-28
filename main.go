@@ -417,6 +417,9 @@ func main() {
 		mcp.WithString("after_pattern",
 			mcp.Description("Pattern that must appear after the main pattern (for context-aware replacement)"),
 		),
+		mcp.WithBoolean("replace_all",
+			mcp.Description("Replace all occurrences (default: true). If false, only replace first occurrence in each file"),
+		),
 	)
 	mcpServer.AddTool(searchReplaceTool, searchReplaceHandler)
 
@@ -1051,8 +1054,9 @@ func searchReplaceHandler(ctx context.Context, request mcp.CallToolRequest) (*mc
 	includeContext := request.GetBool("include_context", false)
 	beforePattern := request.GetString("before_pattern", "")
 	afterPattern := request.GetString("after_pattern", "")
+	replaceAll := request.GetBool("replace_all", true)
 
-	result, err := searchReplace(paths, pattern, replacement, useRegex, caseInsensitive, includeContext, beforePattern, afterPattern)
+	result, err := searchReplace(paths, pattern, replacement, useRegex, caseInsensitive, includeContext, beforePattern, afterPattern, replaceAll)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("search/replace failed: %v", err)), nil
 	}
