@@ -159,12 +159,15 @@ func main() {
 
 	// Define the find_comments tool
 	findCommentsTool := mcp.NewTool("find_comments",
-		mcp.WithDescription("Find undocumented exports, TODOs, and analyze comments"),
+		mcp.WithDescription("Find all comments in Go files, with optional filtering for TODOs or undocumented exports"),
 		mcp.WithString("dir",
 			mcp.Description("Directory to search (default: current directory)"),
 		),
 		mcp.WithString("type",
-			mcp.Description("Comment type to find: 'todo', 'undocumented', or 'all' (default: 'all')"),
+			mcp.Description("Comment type: 'todo' (filters by TODO keywords), 'undocumented' (finds undocumented exports), or 'all' (returns all comments, default)"),
+		),
+		mcp.WithString("filter",
+			mcp.Description("Optional regex to filter comments (applies to 'todo' and 'all' types)"),
 		),
 	)
 	mcpServer.AddTool(findCommentsTool, findCommentsHandler)
@@ -678,8 +681,9 @@ func analyzeTestsHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp
 func findCommentsHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	dir := request.GetString("dir", "./")
 	commentType := request.GetString("type", "all")
+	filter := request.GetString("filter", "")
 
-	comments, err := findComments(dir, commentType)
+	comments, err := findComments(dir, commentType, filter)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("failed to find comments: %v", err)), nil
 	}

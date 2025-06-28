@@ -20,7 +20,7 @@ type CommentItem struct {
 	Position Position `json:"position"`
 }
 
-func findComments(dir string, commentType string) ([]CommentInfo, error) {
+func findComments(dir string, commentType string, filter string) ([]CommentInfo, error) {
 	var comments []CommentInfo
 
 	err := walkGoFiles(dir, func(path string, src []byte, file *ast.File, fset *token.FileSet) error {
@@ -28,16 +28,28 @@ func findComments(dir string, commentType string) ([]CommentInfo, error) {
 			File: path,
 		}
 
-		// Find TODOs in comments
+		// Find comments based on type
 		if commentType == "todo" || commentType == "all" {
-			todoRegex := regexp.MustCompile(`(?i)\b(todo|fixme|hack|bug|xxx)\b`)
+			var filterRegex *regexp.Regexp
+			if filter != "" {
+				var err error
+				filterRegex, err = regexp.Compile(filter)
+				if err != nil {
+					return err
+				}
+			} else if commentType == "todo" {
+				// Default TODO regex if no filter provided and type is "todo"
+				filterRegex = regexp.MustCompile(`(?i)\b(todo|fixme|hack|bug|xxx)\b`)
+			}
+			
 			for _, cg := range file.Comments {
 				for _, c := range cg.List {
-					if todoRegex.MatchString(c.Text) {
+					// If no filter or filter matches, include the comment
+					if filterRegex == nil || filterRegex.MatchString(c.Text) {
 						pos := fset.Position(c.Pos())
 						info.TODOs = append(info.TODOs, CommentItem{
 							Comment:  c.Text,
-							Type:     "todo",
+							Type:     "comment",
 							Position: newPosition(pos),
 						})
 					}
