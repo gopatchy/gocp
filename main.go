@@ -1035,8 +1035,11 @@ func searchReplaceHandler(ctx context.Context, request mcp.CallToolRequest) (*mc
 	}
 
 	var replacement *string
-	if r, exists := request.GetOptionalString("replacement"); exists {
-		replacement = &r
+	args := request.GetArguments()
+	if val, ok := args["replacement"]; ok {
+		if str, ok := val.(string); ok {
+			replacement = &str
+		}
 	}
 
 	useRegex := request.GetBool("regex", false)
