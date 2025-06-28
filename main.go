@@ -387,7 +387,7 @@ func main() {
 
 	// Define the search_replace tool
 	searchReplaceTool := mcp.NewTool("search_replace",
-		mcp.WithDescription("Search and optionally replace text in files. Supports context-aware replacements with capture groups."),
+		mcp.WithDescription("Search and optionally replace text in files. Supports context-aware replacements with before/after patterns."),
 		mcp.WithString("paths",
 			mcp.Required(),
 			mcp.Description("File/directory path or comma-separated paths to search"),
@@ -408,11 +408,11 @@ func main() {
 		mcp.WithBoolean("include_context",
 			mcp.Description("Include line context in search results (default: false)"),
 		),
-		mcp.WithString("context_pattern",
-			mcp.Description("Context pattern with capture groups, e.g., '(prefix)(target)(suffix)' to replace only the target"),
+		mcp.WithString("before_pattern",
+			mcp.Description("Pattern that must appear before the main pattern (for context-aware replacement)"),
 		),
-		mcp.WithNumber("target_group",
-			mcp.Description("Which capture group to replace when using context_pattern (1-based, default: 2 for 3 groups, otherwise last)"),
+		mcp.WithString("after_pattern",
+			mcp.Description("Pattern that must appear after the main pattern (for context-aware replacement)"),
 		),
 	)
 	mcpServer.AddTool(searchReplaceTool, searchReplaceHandler)
@@ -1035,30 +1035,17 @@ func searchReplaceHandler(ctx context.Context, request mcp.CallToolRequest) (*mc
 	}
 
 	var replacement *string
-	if r := request.GetString("replacement", ""); r != "" {
+	if r, exists := request.GetOptionalString("replacement"); exists {
 		replacement = &r
 	}
 
 	useRegex := request.GetBool("regex", false)
 	caseInsensitive := request.GetBool("case_insensitive", false)
 	includeContext := request.GetBool("include_context", false)
-	contextPattern := request.GetString("context_pattern", "")
-	targetGroup := int(request.GetFloat("target_group", 0))
+	beforePattern := request.GetString("before_pattern", "")
+	afterPattern := request.GetString("after_pattern", "")
 
-	// If context pattern is provided, use the context-aware replacement
-	if contextPattern != "" && replacement != nil && targetGroup > 0 {
-		result, err := searchReplaceWithGroups(paths, contextPattern, *replacement, targetGroup, caseInsensitive)
-		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("search/replace failed: %v", err)), nil
-		}
-		jsonData, err := json.Marshal(result)
-		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("failed to marshal result: %v", err)), nil
-		}
-		return mcp.NewToolResultText(string(jsonData)), nil
-	}
-
-	result, err := searchReplace(paths, pattern, replacement, useRegex, caseInsensitive, includeContext, contextPattern)
+	result, err := searchReplace(paths, pattern, replacement, useRegex, caseInsensitive, includeContext, beforePattern, afterPattern)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("search/replace failed: %v", err)), nil
 	}
